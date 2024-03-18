@@ -13,7 +13,17 @@ import config as cfg
 fred = Fred(api_key=cfg.api_key)
 
 
-# In[1] extract raw data
+# In[1] set DB connection
+'''set database connection'''
+import pyodbc
+def connect_DB(data_pool_server,
+               data_pool_database,
+               driver="Driver={SQL Server Native Client 11.0}",
+               connection="Trusted_Connection=yes"):
+    return pyodbc.connect(driver + ';' + data_pool_server + ';' + data_pool_database + ';' + connection + ';')
+
+
+# In[2] extract raw data
 
 raw_data_df = pd.read_csv(cfg.data_link, index_col=0)[1:]
 
