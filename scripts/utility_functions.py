@@ -159,6 +159,62 @@ def get_idx_for_col_trans(feat_names, col_type:str):
                 feat_idx_mapping.append(i)
     return feat_idx_mapping
 
+def get_feature_correlation(df:pd.DataFrame, top_n:int=None, 
+                            corr_method:str='spearman', remove_duplicates:bool=True, 
+                            remove_self_correlations:bool=True)->pd.DataFrame:
+    '''
+    Compute the feature correlation and sort feature pairs based on their correlation
+
+    :param df: Dataframe with predictor variables
+    :param top_n: Top N feature pairs to be reported (if None, return all pairs)
+    :param corr_method: Correlation computation method
+    :param remove_duplicates: whether duplicate features must be removed
+    :param remove_self_correlations: whether self correlation will be removed
+
+    :return: DataFrame
+    '''
+    corr_matrix_abs = df.corr(method=corr_method).abs
+    corr_matrix_abs_us = corr_matrix_abs.unstack()
+    sorted_corr_feats = corr_matrix_abs_us.sort_values(kind='quicksort', ascending=False).reset_index()
+
+    if remove_self_correlations:
+        sorted_corr_feats = sorted_corr_feats[(sorted_corr_feats.level_0!=sorted_corr_feats.level_1)]
+
+    if remove_duplicates:
+        sorted_corr_feats = sorted_corr_feats.iloc[:-2:2]
+
+    sorted_corr_feats.columns = ['Feature 1', 'Feature 2', 'Correlation (abs)']
+    sorted_corr_feats = sorted_corr_feats[~sorted_corr_feats.apply(frozenset, axis=1).duplicated()]
+    if top_n:
+        return sorted_corr_feats[:top_n]
+
+    return sorted_corr_feats
+
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class CorrFilterTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self._columns = None
+
+    @property
+    def columns_(self):
+        if self._columns is None:
+            raise Exception('CorrFilterTransformer has not been fitted yet')
+        return self._columns
+
+    def fit(self, X, y=None):
+        corr_df = get_feature_correlation(X)
+        high_corr_cols = corr_df[corr_df['Correlation (abs)'] > 0.9]['Feature 1'].unique()
+        self._columns = high_corr_cols
+        return self
+
+    def transform(self, X, y=None):
+        X = X[self._columns]
+        return X
+
+    def get_feature_names_out(self, input_features=None):
+        return self._columns    
+    
 
 '''------------------------------------------ML functions------------------------------------------'''
 # Result evaluation functions
